@@ -1,17 +1,78 @@
 import { type ClientSchema, a, defineData } from "@aws-amplify/backend";
 
-/*== STEP 1 ===============================================================
-The section below creates a Todo database table with a "content" field. Try
-adding a new "isDone" field as a boolean. The authorization rule below
-specifies that any user authenticated via an API key can "create", "read",
-"update", and "delete" any "Todo" records.
-=========================================================================*/
 const schema = a.schema({
-  Todo: a
+  User: a
     .model({
-      content: a.string(),
+      email: a.string().required(),
+      name: a.string().required(),
+      role: a.enum(["STUDENT", "TUTOR"]).required(),
+      // Relationships
+      assignedTests: a.hasMany("Test", "assignedTo"),
+      createdTests: a.hasMany("Test", "createdBy"),
     })
-    .authorization((allow) => [allow.publicApiKey()]),
+    .authorization((allow) => [
+      allow.owner(),
+      allow.publicApiKey().to(["read"]),
+    ]),
+
+  Test: a
+    .model({
+      title: a.string().required(),
+      description: a.string(),
+      // Relationships
+      questions: a.hasMany("Question"),
+      assignedTo: a.belongsTo("User", "assignedTests"),
+      createdBy: a.belongsTo("User", "createdTests"),
+      attempts: a.hasMany("TestAttempt"),
+    })
+    .authorization((allow) => [
+      allow.owner(),
+      allow.publicApiKey().to(["read"]),
+    ]),
+
+  Question: a
+    .model({
+      content: a.string().required(),
+      type: a.enum(["MULTIPLE_CHOICE", "TRUE_FALSE"]).required(),
+      options: a.string().array(),
+      correctAnswer: a.string().required(),
+      points: a.integer().required(),
+      // Relationship
+      test: a.belongsTo("Test", "questions"),
+    })
+    .authorization((allow) => [
+      allow.owner(),
+      allow.publicApiKey().to(["read"]),
+    ]),
+
+  TestAttempt: a
+    .model({
+      startTime: a.datetime().required(),
+      endTime: a.datetime(),
+      score: a.float(),
+      completed: a.boolean().required(),
+      // Relationships
+      test: a.belongsTo("Test", "attempts"),
+      answers: a.hasMany("Answer"),
+      student: a.belongsTo("User"),
+    })
+    .authorization((allow) => [
+      allow.owner(),
+      allow.publicApiKey().to(["read"]),
+    ]),
+
+  Answer: a
+    .model({
+      selectedOption: a.string().required(),
+      isCorrect: a.boolean().required(),
+      // Relationships
+      question: a.belongsTo("Question"),
+      testAttempt: a.belongsTo("TestAttempt", "answers"),
+    })
+    .authorization((allow) => [
+      allow.owner(),
+      allow.publicApiKey().to(["read"]),
+    ]),
 });
 
 export type Schema = ClientSchema<typeof schema>;
